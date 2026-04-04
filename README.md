@@ -58,16 +58,12 @@ For each model, the integration creates:
 
 ## How It Works
 
-```
-┌─────────────┐     state change      ┌──────────────┐     MQTT      ┌─────────────┐
-│  HA Sensors  │ ──────────────────── → │ ML Presence  │ ─────────── → │   ml2mqtt   │
-│ (Bermuda,    │                        │ Integration  │               │   Add-on    │
-│  Motion)     │                        │              │ ← ─────────── │             │
-└─────────────┘                        │              │   prediction  └─────────────┘
-                                       │              │
-                                       │  Creates     │
-                                       │  HA Entities │
-                                       └──────────────┘
+```mermaid
+flowchart LR
+    A["HA Sensors\n(Bermuda, Motion)"] -- state change --> B["ML Presence\nIntegration"]
+    B -- MQTT publish --> C["ml2mqtt\nAdd-on"]
+    C -- prediction --> B
+    B -- creates --> D["HA Entities\n(Room, Confidence)"]
 ```
 
 1. **Trigger entity changes** → Integration publishes all configured entity states to MQTT
