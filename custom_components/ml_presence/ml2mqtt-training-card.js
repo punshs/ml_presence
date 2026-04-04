@@ -598,7 +598,7 @@ ha-card{background:transparent!important;box-shadow:none!important;border:none!i
 .model-bar{display:flex;gap:8px;justify-content:center;padding:8px 0;flex-wrap:wrap}
 .model-btn{padding:8px 20px;border-radius:24px;border:1.5px solid var(--bdr);background:transparent;color:var(--txd);font-size:.85rem;font-weight:600;cursor:pointer;transition:all .25s;font-family:inherit;-webkit-tap-highlight-color:transparent}
 .model-btn:hover{background:var(--bgp)}
-.model-btn.active{border-color:var(--o);color:var(--o);background:rgba(255,152,0,.1)}
+.model-btn.active{border-color:var(--c);background:var(--c);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.15)}
 
 /* Status */
 .status-row{display:flex;justify-content:center}
@@ -647,7 +647,7 @@ ha-card{background:transparent!important;box-shadow:none!important;border:none!i
 
 /* Main Cards / Panels */
 .card-section, .panel{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
-.sec-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bdr);background:rgba(0,0,0,0.1)}
+.sec-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bdr);background:var(--bgp)}
 .sec-title{font-size:.85rem;font-weight:700;color:var(--txd);text-transform:uppercase;letter-spacing:.08em}
 .sec-meta{font-size:.7rem;color:var(--txm)}
 
@@ -677,8 +677,8 @@ ha-card{background:transparent!important;box-shadow:none!important;border:none!i
 .lbl-cnt b{color:var(--tx);font-weight:600}
 
 /* Expandable Panels */
-.panel-hd{width:100%;display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:rgba(0,0,0,0.1);border:none;color:var(--txd);font-size:.95rem;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:inherit}
-.panel-hd:hover{background:rgba(255,255,255,.04)}
+.panel-hd{width:100%;display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:var(--bgp);border:none;color:var(--tx);font-size:.95rem;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:inherit;transition:background 0.2s}
+.panel-hd:hover{background:var(--bdr)}
 .chev{font-size:.9rem;transition:transform .3s;display:inline-block}
 .chev.open{transform:rotate(180deg)}
 .panel-bd{overflow:hidden;transition:max-height .35s ease-in-out;max-height:0}
