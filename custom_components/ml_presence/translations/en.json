@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure ML Presence Model",
+        "description": "Connect to an ml2mqtt model. If the model doesn't exist yet it will be created automatically.",
+        "data": {
+          "model_name": "Model name",
+          "mqtt_topic": "MQTT topic (e.g. ml2mqtt/sam_whoop)",
+          "addon_slug": "Add-on slug"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the ml2mqtt add-on. Is it running?",
+      "model_not_found": "Model not found and could not be created.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This model is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ML Presence Sensors — {model_name}",
+        "description": "Select which entities to track. **Trigger entities** cause a data push on every state change. **Context entities** are included in the payload but don't trigger a push.",
+        "data": {
+          "trigger_entities": "Trigger entities (distance sensors)",
+          "context_entities": "Context entities (motion, media, etc.)",
+          "poll_interval": "Prediction poll interval"
+        }
+      }
+    }
+  }
+}

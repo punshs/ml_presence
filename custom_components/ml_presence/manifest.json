@@ -1,0 +1,12 @@
+{
+  "domain": "ml_presence",
+  "name": "ML Presence",
+  "version": "1.0.0",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["mqtt"],
+  "documentation": "",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "requirements": []
+}
