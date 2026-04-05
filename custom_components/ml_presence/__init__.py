@@ -225,7 +225,9 @@ def _setup_sensor_bridge(
             else:
                 payload[entity_id] = "unavailable"
 
-        mqtt.async_publish(hass, publish_topic, json.dumps(payload))
+        hass.async_create_task(
+            mqtt.async_publish(hass, publish_topic, json.dumps(payload))
+        )
 
     unsub = async_track_state_change_event(hass, trigger_entities, _on_trigger_state_change)
     hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub)
