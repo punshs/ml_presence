@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,10 @@ from homeassistant.config_entries import ConfigEntry
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 
 from .api import Ml2MqttApiClient
 from .const import (
@@ -31,6 +35,10 @@ from .const import (
 from .coordinator import MlPresenceCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# How often to publish sensor snapshots even when no state changes occur.
+# Ensures "Away" data is collected when BLE sensors freeze.
+BRIDGE_PERIODIC_INTERVAL = timedelta(seconds=30)
 
 
 
@@ -188,9 +196,14 @@ def _setup_sensor_bridge(
     entry: ConfigEntry,
     mqtt_topic: str,
 ) -> None:
-    """Register state-change listeners that publish sensor data to MQTT.
+    """Register state-change listeners AND a periodic timer that publish
+    sensor data to MQTT.
 
-    Trigger entities fire a publish on every state change.
+    Event-driven: trigger entities fire a publish on every state change.
+    Periodic:     a timer fires every BRIDGE_PERIODIC_INTERVAL to ensure
+                  data is published even when sensors are frozen (e.g.
+                  when a BLE device is away and Bermuda sensors stop updating).
+
     The payload includes the current state of ALL tracked entities
     (both trigger and context).
     """
@@ -208,15 +221,17 @@ def _setup_sensor_bridge(
         return
 
     _LOGGER.info(
-        "Sensor bridge active: %d triggers, %d context entities → %s",
+        "Sensor bridge active: %d triggers, %d context entities → %s "
+        "(periodic interval: %ss)",
         len(trigger_entities),
         len(context_entities),
         publish_topic,
+        int(BRIDGE_PERIODIC_INTERVAL.total_seconds()),
     )
 
     @callback
-    def _on_trigger_state_change(event: Event) -> None:
-        """A trigger entity changed — publish all entity states to MQTT."""
+    def _publish_snapshot(_now=None) -> None:
+        """Collect current states and publish to MQTT."""
         payload: dict[str, str] = {}
         for entity_id in all_entities:
             state = hass.states.get(entity_id)
@@ -229,5 +244,20 @@ def _setup_sensor_bridge(
             mqtt.async_publish(hass, publish_topic, json.dumps(payload))
         )
 
-    unsub = async_track_state_change_event(hass, trigger_entities, _on_trigger_state_change)
-    hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub)
+    # --- Event-driven: publish on trigger entity state changes ---
+    @callback
+    def _on_trigger_state_change(event: Event) -> None:
+        """A trigger entity changed — publish all entity states to MQTT."""
+        _publish_snapshot()
+
+    unsub_event = async_track_state_change_event(
+        hass, trigger_entities, _on_trigger_state_change
+    )
+    hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub_event)
+
+    # --- Periodic: publish every N seconds regardless of state changes ---
+    unsub_timer = async_track_time_interval(
+        hass, _publish_snapshot, BRIDGE_PERIODIC_INTERVAL
+    )
+    hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub_timer)
+

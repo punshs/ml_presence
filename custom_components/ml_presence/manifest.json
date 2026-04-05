@@ -1,7 +1,7 @@
 {
   "domain": "ml_presence",
   "name": "ML Presence",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "codeowners": [],
   "config_flow": true,
   "dependencies": ["mqtt"],
