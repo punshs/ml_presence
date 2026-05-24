@@ -479,8 +479,8 @@ class ML2MQTTTrainingCard extends HTMLElement {
       const counts = d ? (d.total_label_counts || d.label_stats) : null;
       const support = (counts && counts[this._selectedLabel]) || 0;
       if (this._isCollecting) {
-        if (support < 100) {
-          modeStatusEl.textContent = `Eager Bootstrapping: Saving all data (${support}/100)`;
+        if (support < 200) {
+          modeStatusEl.textContent = `Eager Bootstrapping: Saving all data (${support}/200)`;
           modeStatusEl.className = 'mode-status eager';
         } else {
           modeStatusEl.textContent = `Active Learning: Saving error cases (${support} obs)`;
