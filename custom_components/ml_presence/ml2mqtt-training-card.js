@@ -22,6 +22,8 @@ const ML_ICONS = {
   matrix: 'lucide:grid-3x3',
   sensors: 'lucide:radio',
   delete: 'lucide:trash-2',
+  wipe: 'lucide:eraser',
+  synthetic: 'lucide:sparkles',
   retrain: 'lucide:refresh-cw',
   collect: 'lucide:circle-dot',
   collectStop: 'lucide:square',
@@ -232,6 +234,25 @@ class ML2MQTTTrainingCard extends HTMLElement {
       console.error(e);
     }
   }
+  async _generateSynthetic() {
+    if (!this._selectedLabel) { this._showToast('Select a room first', 'warn'); return; }
+    if (!confirm(`Generate 50 synthetic observations for "${this._selectedLabel}"? This is recommended for labels like "Away".`)) return;
+    this._showToast(`Generating synthetic data for ${this._selectedLabel}…`);
+    try {
+      const d = await this._apiCall('POST', `${this._mp}/generate-synthetic`, { label: this._selectedLabel, count: 50 });
+      if (d.success) {
+        this._showToast(`Generated 50 observations!`, 'success');
+        await this._pollLiveData();
+        const dataPanel = this.shadowRoot.getElementById('dataPanel');
+        if (dataPanel && dataPanel.style.maxHeight && dataPanel.style.maxHeight !== '0px') {
+          await this._loadDataHealth();
+        }
+      }
+    } catch (e) {
+      this._showToast('Error generating synthetic data', 'error');
+      console.error(e);
+    }
+  }
   async _startCollecting(label) {
     try {
       const d = await this._apiCall('POST', `${this._mp}/collect`, { action: 'start', label });
@@ -267,16 +288,29 @@ class ML2MQTTTrainingCard extends HTMLElement {
     try { this._renderSensorMgmt(await this._apiCall('GET', `${this._mp}/sensors`)); }
     catch (e) { this._els.sensorList.innerHTML = '<div class="empty">Error loading sensors</div>'; }
   }
-  async _clearLabel(label) {
-    if (!confirm(`Delete ALL data for "${label}"?`)) return;
+  async _wipeLabel(label) {
+    if (!confirm(`Wipe all training observations for "${label}"? (The room will remain configured)`)) return;
+    this._showToast(`Wiping data for ${label}…`);
     try {
-      const d = await this._apiCall('POST', `${this._mp}/label/${encodeURIComponent(label)}/data`, { _method: 'DELETE' });
+      const d = await this._apiCall('POST', `${this._mp}/label/${encodeURIComponent(label)}/data`, { _method: 'DELETE', keep_config: true });
       if (d.success) {
-        this._showToast(`Cleared ${label}`);
+        this._showToast(`Wiped data for ${label}`, 'success');
         await this._pollLiveData();
         await this._loadDataHealth();
       }
-    } catch (e) { this._showToast('Error clearing data', 'error'); }
+    } catch (e) { this._showToast('Error wiping label data', 'error'); }
+  }
+  async _deleteLabel(label) {
+    if (!confirm(`Delete room "${label}"? This will delete all training observations AND remove the room from config.`)) return;
+    this._showToast(`Deleting room ${label}…`);
+    try {
+      const d = await this._apiCall('POST', `${this._mp}/label/${encodeURIComponent(label)}/data`, { _method: 'DELETE', keep_config: false });
+      if (d.success) {
+        this._showToast(`Deleted room ${label}`, 'success');
+        await this._pollLiveData();
+        await this._loadDataHealth();
+      }
+    } catch (e) { this._showToast('Error deleting room', 'error'); }
   }
   async _addSensor(entityId, sensorType) {
     if (!entityId) { this._showToast('Select an entity first', 'warn'); return; }
@@ -338,7 +372,11 @@ class ML2MQTTTrainingCard extends HTMLElement {
     if (banner && text) {
       if (d.model_error) {
         banner.style.display = 'flex';
-        text.textContent = d.model_error;
+        let msg = d.model_error;
+        if (msg.includes('Single-class dataset') || msg.includes('at least 2 distinct rooms')) {
+          msg = "Model updates paused. Collect observations for at least 2 distinct rooms to enable predictions.";
+        }
+        text.textContent = msg;
       } else {
         banner.style.display = 'none';
       }
@@ -442,8 +480,8 @@ class ML2MQTTTrainingCard extends HTMLElement {
       const counts = d ? (d.total_label_counts || d.label_stats) : null;
       const support = (counts && counts[this._selectedLabel]) || 0;
       if (this._isCollecting) {
-        if (support < 50) {
-          modeStatusEl.textContent = `Eager Bootstrapping: Saving all data (${support}/50)`;
+        if (support < 100) {
+          modeStatusEl.textContent = `Eager Bootstrapping: Saving all data (${support}/100)`;
           modeStatusEl.className = 'mode-status eager';
         } else {
           modeStatusEl.textContent = `Active Learning: Saving error cases (${support} obs)`;
@@ -512,12 +550,14 @@ class ML2MQTTTrainingCard extends HTMLElement {
         <div class="dh-head">
           <span class="dh-name">${this._esc(l)}</span>
           <div class="dh-stats"><span class="dh-num">${c} obs</span><span class="dh-pct">${absPct}%</span>
-          <button class="icon-btn del-btn" data-label="${this._esc(l)}" title="Clear"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></button></div>
+          <button class="icon-btn wipe-btn-row" data-label="${this._esc(l)}" title="Wipe observations (keep room)"><ha-icon icon="${ML_ICONS.wipe}"></ha-icon></button>
+          <button class="icon-btn del-btn-row" data-label="${this._esc(l)}" title="Delete room & observations"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></button></div>
         </div>
         <div class="lb-track"><div class="lb-fill ${c < mx * 0.4 ? 'low' : 'good'}" style="width:${pct}%"></div></div>
       </div>`;
     }).join('') + '</div>';
-    b.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); this._clearLabel(btn.dataset.label); }));
+    b.querySelectorAll('.wipe-btn-row').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); this._wipeLabel(btn.dataset.label); }));
+    b.querySelectorAll('.del-btn-row').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); this._deleteLabel(btn.dataset.label); }));
   }
 
   _renderConfusionMatrix(json) {
@@ -661,6 +701,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
   <!-- Collect -->
   <div class="collect-section">
     <button class="collect-btn" id="collectBtn"><span class="ci" id="collectIcon"><ha-icon icon="${ML_ICONS.collect}"></ha-icon></span><span id="collectText">START COLLECTING</span></button>
+    <button class="synthetic-btn" id="syntheticBtn"><span class="ci"><ha-icon icon="${ML_ICONS.synthetic}"></ha-icon></span><span>Generate Synthetic Data</span></button>
     <button class="wipe-btn" id="wipeHourBtn"><span class="ci"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></span><span>Wipe Last Hour of Data</span></button>
     <div class="mode-status idle" id="trainingModeStatus">Select a room to begin training</div>
   </div>
@@ -701,6 +742,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
       smoothedBadge: $('smoothedBadge'), smoothedLabel: $('smoothedLabel'),
       labelPills: $('labelPills'),
       collectBtn: $('collectBtn'), collectIcon: $('collectIcon'), collectText: $('collectText'),
+      syntheticBtn: $('syntheticBtn'),
       trainingModeStatus: $('trainingModeStatus'),
       sensorTable: $('sensorTable'), lastUpdate: $('lastUpdate'),
       obsCount: $('obsCount'), accuracy: $('accuracy'), labelBreakdown: $('labelBreakdown'),
@@ -713,6 +755,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
   _attachEvents() {
     const $ = id => this.shadowRoot.getElementById(id);
     $('collectBtn').addEventListener('click', () => this._toggleCollection());
+    $('syntheticBtn').addEventListener('click', () => this._generateSynthetic());
     $('wipeHourBtn').addEventListener('click', () => this._wipeLastHour());
     $('dataPanelToggle').addEventListener('click', () => this._togglePanel('dataPanel'));
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
@@ -743,6 +786,12 @@ ha-icon{--mdc-icon-size:18px}
 .del-btn{color:var(--r);opacity:0.6;padding:5px}
 .del-btn ha-icon{--mdc-icon-size:16px}
 .del-btn:hover{opacity:1;background:rgba(var(--r-rgb),0.1)}
+.wipe-btn-row{color:var(--o);opacity:0.6;padding:5px}
+.wipe-btn-row ha-icon{--mdc-icon-size:16px}
+.wipe-btn-row:hover{opacity:1;background:rgba(var(--o-rgb),0.1)}
+.del-btn-row{color:var(--r);opacity:0.6;padding:5px}
+.del-btn-row ha-icon{--mdc-icon-size:16px}
+.del-btn-row:hover{opacity:1;background:rgba(var(--r-rgb),0.1)}
 
 /* Model Switcher */
 .model-bar{display:flex;gap:8px;justify-content:center;padding:8px 0;flex-wrap:wrap}
