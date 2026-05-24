@@ -23,7 +23,6 @@ const ML_ICONS = {
   sensors: 'lucide:radio',
   delete: 'lucide:trash-2',
   wipe: 'lucide:eraser',
-  synthetic: 'lucide:sparkles',
   retrain: 'lucide:refresh-cw',
   collect: 'lucide:circle-dot',
   collectStop: 'lucide:square',
@@ -698,10 +697,8 @@ class ML2MQTTTrainingCard extends HTMLElement {
   <!-- Pills -->
   <div class="pills" id="labelPills"></div>
 
-  <!-- Collect -->
   <div class="collect-section">
     <button class="collect-btn" id="collectBtn"><span class="ci" id="collectIcon"><ha-icon icon="${ML_ICONS.collect}"></ha-icon></span><span id="collectText">START COLLECTING</span></button>
-    <button class="synthetic-btn" id="syntheticBtn"><span class="ci"><ha-icon icon="${ML_ICONS.synthetic}"></ha-icon></span><span>Generate Synthetic Data</span></button>
     <button class="wipe-btn" id="wipeHourBtn"><span class="ci"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></span><span>Wipe Last Hour of Data</span></button>
     <div class="mode-status idle" id="trainingModeStatus">Select a room to begin training</div>
   </div>
@@ -742,7 +739,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
       smoothedBadge: $('smoothedBadge'), smoothedLabel: $('smoothedLabel'),
       labelPills: $('labelPills'),
       collectBtn: $('collectBtn'), collectIcon: $('collectIcon'), collectText: $('collectText'),
-      syntheticBtn: $('syntheticBtn'),
       trainingModeStatus: $('trainingModeStatus'),
       sensorTable: $('sensorTable'), lastUpdate: $('lastUpdate'),
       obsCount: $('obsCount'), accuracy: $('accuracy'), labelBreakdown: $('labelBreakdown'),
@@ -755,7 +751,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
   _attachEvents() {
     const $ = id => this.shadowRoot.getElementById(id);
     $('collectBtn').addEventListener('click', () => this._toggleCollection());
-    $('syntheticBtn').addEventListener('click', () => this._generateSynthetic());
     $('wipeHourBtn').addEventListener('click', () => this._wipeLastHour());
     $('dataPanelToggle').addEventListener('click', () => this._togglePanel('dataPanel'));
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
