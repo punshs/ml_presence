@@ -214,22 +214,25 @@ class ML2MQTTTrainingCard extends HTMLElement {
     if (!this._selectedLabel) { this._showToast('Select a room first', 'warn'); return; }
     return this._startCollecting(this._selectedLabel);
   }
-  async _wipeLastHour() {
-    if (!confirm('Are you sure you want to delete all training observations recorded in the last hour? This action cannot be undone.')) return;
-    this._showToast('Wiping last hour of data…');
+  async _undoSession() {
+    const label = this._lastLiveData?.last_session_label || 'session';
+    if (!confirm(`Are you sure you want to delete all training observations recorded during the session for "${label}"? This action cannot be undone.`)) return;
+    this._showToast('Undoing collection session…');
     try {
-      const d = await this._apiCall('POST', `${this._mp}/observations/delete`, { scope: 'hour' });
+      const d = await this._apiCall('POST', `${this._mp}/session/undo`);
       if (d.success) {
-        this._showToast('Successfully wiped last hour of data', 'success');
+        this._showToast(`Successfully deleted ${d.deleted_count} observations`, 'success');
         await this._pollLiveData();
         // Also reload data health if Data Manager is expanded
         const dataPanel = this.shadowRoot.getElementById('dataPanel');
         if (dataPanel && dataPanel.style.maxHeight && dataPanel.style.maxHeight !== '0px') {
           await this._loadDataHealth();
         }
+      } else {
+        this._showToast(d.error || 'Failed to undo session', 'error');
       }
     } catch (e) {
-      this._showToast('Error wiping data', 'error');
+      this._showToast('Error undoing session', 'error');
       console.error(e);
     }
   }
@@ -497,6 +500,18 @@ class ML2MQTTTrainingCard extends HTMLElement {
     this._isCollecting = !!d.collecting;
     if (d.collecting && d.collecting_label) this._selectedLabel = d.collecting_label;
     this._updateCollectionUI();
+
+    // Show/hide undo button dynamically
+    const undoBtn = this._els.undoSessionBtn;
+    const undoText = this._els.undoSessionText;
+    if (undoBtn && undoText) {
+      if (d.has_undo) {
+        undoBtn.style.display = 'inline-flex';
+        undoText.textContent = `Undo Session (${d.last_session_label})`;
+      } else {
+        undoBtn.style.display = 'none';
+      }
+    }
   }
 
   /* ── Model Switcher ───────────────────────────────────────── */
@@ -699,7 +714,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
 
   <div class="collect-section">
     <button class="collect-btn" id="collectBtn"><span class="ci" id="collectIcon"><ha-icon icon="${ML_ICONS.collect}"></ha-icon></span><span id="collectText">START COLLECTING</span></button>
-    <button class="wipe-btn" id="wipeHourBtn"><span class="ci"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></span><span>Wipe Last Hour of Data</span></button>
+    <button class="wipe-btn" id="undoSessionBtn" style="display: none;"><span class="ci"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></span><span id="undoSessionText">Undo Session</span></button>
     <div class="mode-status idle" id="trainingModeStatus">Select a room to begin training</div>
   </div>
 
@@ -740,6 +755,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
       labelPills: $('labelPills'),
       collectBtn: $('collectBtn'), collectIcon: $('collectIcon'), collectText: $('collectText'),
       trainingModeStatus: $('trainingModeStatus'),
+      undoSessionBtn: $('undoSessionBtn'), undoSessionText: $('undoSessionText'),
       sensorTable: $('sensorTable'), lastUpdate: $('lastUpdate'),
       obsCount: $('obsCount'), accuracy: $('accuracy'), labelBreakdown: $('labelBreakdown'),
       dataWarnings: $('dataWarnings'), labelBars: $('labelBars'),
@@ -751,7 +767,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
   _attachEvents() {
     const $ = id => this.shadowRoot.getElementById(id);
     $('collectBtn').addEventListener('click', () => this._toggleCollection());
-    $('wipeHourBtn').addEventListener('click', () => this._wipeLastHour());
+    $('undoSessionBtn').addEventListener('click', () => this._undoSession());
     $('dataPanelToggle').addEventListener('click', () => this._togglePanel('dataPanel'));
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
     $('sensorPanelToggle').addEventListener('click', () => this._togglePanel('sensorPanel'));

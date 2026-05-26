@@ -58,6 +58,14 @@ class MlPresenceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 f"Error fetching data for {self.model_name}: {err}"
             ) from err
 
+        # Override prediction if user is away according to the Bermuda tracker
+        tracker_entity_id = f"device_tracker.{self.model_name}_bermuda_tracker"
+        tracker_state = self.hass.states.get(tracker_entity_id)
+        if tracker_state is not None and tracker_state.state == "not_home":
+            data["prediction"] = "away"
+            data["smoothed_prediction"] = "away"
+            data["confidence"] = 1.0
+
         return data
 
     def handle_mqtt_prediction(self, prediction: str, confidence: float) -> None:
@@ -66,6 +74,13 @@ class MlPresenceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Merges the new prediction into the existing coordinator data and
         dispatches to all listening entities immediately.
         """
+        # Override prediction if user is away according to the Bermuda tracker
+        tracker_entity_id = f"device_tracker.{self.model_name}_bermuda_tracker"
+        tracker_state = self.hass.states.get(tracker_entity_id)
+        if tracker_state is not None and tracker_state.state == "not_home":
+            prediction = "away"
+            confidence = 1.0
+
         current = dict(self.data) if self.data else {}
         current["prediction"] = prediction
         current["smoothed_prediction"] = prediction
