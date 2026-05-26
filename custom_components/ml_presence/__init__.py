@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from homeassistant.components import mqtt
-from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.http import StaticPathConfig, HomeAssistantView
+from aiohttp import web
 from homeassistant.config_entries import ConfigEntry
 
 from homeassistant.core import Event, HomeAssistant, callback
@@ -41,6 +42,74 @@ _LOGGER = logging.getLogger(__name__)
 BRIDGE_PERIODIC_INTERVAL = timedelta(seconds=30)
 
 
+class MlPresenceProxyView(HomeAssistantView):
+    """API endpoint to proxy requests to the ml2mqtt container."""
+
+    url = "/api/ml_presence/proxy/{model_name}/{path:.*}"
+    name = "api:ml_presence:proxy"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def _handle(self, request: web.Request, model_name: str, path: str) -> web.Response:
+        """Forward the request to the ml2mqtt API."""
+        api_client = None
+        for entry_id, entry_data in self.hass.data.get(DOMAIN, {}).items():
+            if not isinstance(entry_data, dict):
+                continue
+            coordinator = entry_data.get("coordinator")
+            if coordinator and coordinator.model_name == model_name:
+                api_client = entry_data.get("api")
+                break
+
+        if not api_client:
+            return web.Response(text=f"Model '{model_name}' not active", status=404)
+
+        # Build target URL
+        target_url = f"{api_client._base_url}/api/{path}"
+
+        # Read request body
+        body = None
+        if request.body_exists:
+            body = await request.read()
+
+        # Forward method, headers, query params
+        method = request.method
+        headers = {
+            "Content-Type": request.content_type or "application/json"
+        }
+
+        # Make the request to the container
+        try:
+            async with api_client._session.request(
+                method,
+                target_url,
+                headers=headers,
+                data=body,
+                params=request.query,
+                timeout=30
+            ) as resp:
+                resp_body = await resp.read()
+                # Return the response with same status and headers (except transfer-encoding)
+                resp_headers = {k: v for k, v in resp.headers.items() if k.lower() != 'transfer-encoding'}
+                return web.Response(
+                    body=resp_body,
+                    status=resp.status,
+                    headers=resp_headers
+                )
+        except Exception as e:
+            _LOGGER.exception("Proxy request to ml2mqtt failed")
+            return web.Response(text=f"Proxy error: {str(e)}", status=502)
+
+    async def get(self, request: web.Request, model_name: str, path: str) -> web.Response:
+        return await self._handle(request, model_name, path)
+
+    async def post(self, request: web.Request, model_name: str, path: str) -> web.Response:
+        return await self._handle(request, model_name, path)
+
+    async def delete(self, request: web.Request, model_name: str, path: str) -> web.Response:
+        return await self._handle(request, model_name, path)
 
 
 def _build_addon_url(slug: str) -> str:
@@ -52,6 +121,9 @@ def _build_addon_url(slug: str) -> str:
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the ML Presence integration (YAML — not used)."""
     hass.data.setdefault(DOMAIN, {})
+
+    # Register the proxy view
+    hass.http.register_view(MlPresenceProxyView(hass))
 
     # Register the frontend card JS as a static path (one-time).
     card_path = Path(__file__).parent / CARD_JS_FILENAME
