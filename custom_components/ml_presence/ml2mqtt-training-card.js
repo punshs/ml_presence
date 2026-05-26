@@ -197,7 +197,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
       this._updateSensors(d.sensors);
       this._updateStats(d);
       this._syncServerState(d);
-      this._updateModeUI(d.learning_type);
       if (d.model_error && !d.model_trained) {
         this._setStatus('warning');
       } else {
@@ -214,18 +213,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
     if (this._isCollecting) return this._stopCollecting();
     if (!this._selectedLabel) { this._showToast('Select a room first', 'warn'); return; }
     return this._startCollecting(this._selectedLabel);
-  }
-  async _setLearningType(type) {
-    this._showToast(`Setting mode: ${type.toLowerCase()}…`);
-    try {
-      const d = await this._apiCall('POST', `${this._mp}/learning-type`, { learning_type: type });
-      if (d.success) {
-        this._showToast(`Mode updated to ${type.toLowerCase()}`, 'success');
-        await this._pollLiveData();
-      }
-    } catch (e) {
-      this._showToast('Error updating learning mode', 'error');
-    }
   }
   async _undoSession() {
     const label = this._lastLiveData?.last_session_label || 'session';
@@ -381,19 +368,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
     dot.title = s === 'connected' ? 'Connected' : s === 'warning' ? `Model Warning: ${errorMsg}` : s === 'error' ? 'Connection error' : 'Connecting…';
   }
 
-  _updateModeUI(type) {
-    const eager = this._els.modeEagerBtn;
-    const lazy = this._els.modeLazyBtn;
-    const hint = this._els.modeHint;
-    if (!eager || !lazy || !hint) return;
-    
-    eager.classList.toggle('active', type === 'EAGER');
-    lazy.classList.toggle('active', type === 'LAZY' || type === 'AUTO');
-    hint.textContent = type === 'EAGER'
-      ? 'Eager: saves every reading'
-      : 'Lazy: saves only wrong predictions';
-  }
-
   _updateWarningBanner(d) {
     const banner = this._els.warningBanner;
     const text = this._els.warningBannerText;
@@ -526,7 +500,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
     this._isCollecting = !!d.collecting;
     if (d.collecting && d.collecting_label) this._selectedLabel = d.collecting_label;
     this._updateCollectionUI();
-    if (d.learning_type) this._updateModeUI(d.learning_type);
 
     // Show/hide undo button dynamically
     const undoBtn = this._els.undoSessionBtn;
@@ -742,13 +715,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
   <div class="collect-section">
     <button class="collect-btn" id="collectBtn"><span class="ci" id="collectIcon"><ha-icon icon="${ML_ICONS.collect}"></ha-icon></span><span id="collectText">START COLLECTING</span></button>
     <button class="wipe-btn" id="undoSessionBtn" style="display: none;"><span class="ci"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></span><span id="undoSessionText">Undo Session</span></button>
-    <div class="mode-row">
-      <div class="mode-pills">
-        <button class="mp" id="modeEagerBtn">Eager</button>
-        <button class="mp" id="modeLazyBtn">Lazy</button>
-      </div>
-      <div class="mode-hint" id="modeHint">Eager: saves every reading</div>
-    </div>
     <div class="mode-status idle" id="trainingModeStatus">Select a room to begin training</div>
   </div>
 
@@ -788,7 +754,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
       smoothedBadge: $('smoothedBadge'), smoothedLabel: $('smoothedLabel'),
       labelPills: $('labelPills'),
       collectBtn: $('collectBtn'), collectIcon: $('collectIcon'), collectText: $('collectText'),
-      modeEagerBtn: $('modeEagerBtn'), modeLazyBtn: $('modeLazyBtn'), modeHint: $('modeHint'),
       trainingModeStatus: $('trainingModeStatus'),
       undoSessionBtn: $('undoSessionBtn'), undoSessionText: $('undoSessionText'),
       sensorTable: $('sensorTable'), lastUpdate: $('lastUpdate'),
@@ -802,8 +767,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
   _attachEvents() {
     const $ = id => this.shadowRoot.getElementById(id);
     $('collectBtn').addEventListener('click', () => this._toggleCollection());
-    $('modeEagerBtn').addEventListener('click', () => this._setLearningType('EAGER'));
-    $('modeLazyBtn').addEventListener('click', () => this._setLearningType('LAZY'));
     $('undoSessionBtn').addEventListener('click', () => this._undoSession());
     $('dataPanelToggle').addEventListener('click', () => this._togglePanel('dataPanel'));
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
