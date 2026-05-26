@@ -28,7 +28,8 @@
         "data": {
           "trigger_entities": "Trigger entities (distance sensors)",
           "context_entities": "Context entities (motion, media, etc.)",
-          "poll_interval": "Prediction poll interval"
+          "poll_interval": "Prediction poll interval",
+          "addon_slug": "Add-on slug or URL (e.g. 192.168.86.57:5005)"
         }
       }
     }

@@ -30,11 +30,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _build_addon_url(slug: str) -> str:
-    """Build the direct container URL for an add-on."""
-    # Inside the HA Docker network, add-ons are reachable at
-    # http://<slug_with_underscores_replaced>:PORT
+    """Build the direct container URL for an add-on or a standalone API server."""
+    if slug.startswith("http://") or slug.startswith("https://"):
+        return slug.rstrip("/")
+    if ":" in slug or "." in slug:
+        return f"http://{slug}".rstrip("/")
     hostname = slug.replace("_", "-")
     return f"http://{hostname}:5000"
+
 
 
 class MlPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -155,6 +158,10 @@ class MlPresenceOptionsFlow(config_entries.OptionsFlow):
         current_poll = self._config_entry.options.get(
             CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
         )
+        current_addon_slug = self._config_entry.options.get(
+            CONF_ADDON_SLUG,
+            self._config_entry.data.get(CONF_ADDON_SLUG, DEFAULT_ADDON_SLUG)
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -191,6 +198,10 @@ class MlPresenceOptionsFlow(config_entries.OptionsFlow):
                         ),
                         vol.Coerce(int),
                     ),
+                    vol.Optional(
+                        CONF_ADDON_SLUG,
+                        default=current_addon_slug,
+                    ): str,
                 }
             ),
             description_placeholders={

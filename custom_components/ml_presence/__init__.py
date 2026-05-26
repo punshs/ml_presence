@@ -113,9 +113,14 @@ class MlPresenceProxyView(HomeAssistantView):
 
 
 def _build_addon_url(slug: str) -> str:
-    """Build the direct container URL for an add-on."""
+    """Build the direct container URL for an add-on or a standalone API server."""
+    if slug.startswith("http://") or slug.startswith("https://"):
+        return slug.rstrip("/")
+    if ":" in slug or "." in slug:
+        return f"http://{slug}".rstrip("/")
     hostname = slug.replace("_", "-")
     return f"http://{hostname}:5000"
+
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -170,7 +175,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     mqtt_topic: str = entry.data.get(
         CONF_MQTT_TOPIC, f"{DEFAULT_MQTT_TOPIC_PREFIX}/{model_name}"
     )
-    addon_slug: str = entry.data.get(CONF_ADDON_SLUG, DEFAULT_ADDON_SLUG)
+    addon_slug: str = entry.options.get(
+        CONF_ADDON_SLUG, entry.data.get(CONF_ADDON_SLUG, DEFAULT_ADDON_SLUG)
+    )
 
     _LOGGER.info(
         "Setting up ML Presence for model=%s, topic=%s", model_name, mqtt_topic
