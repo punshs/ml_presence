@@ -308,16 +308,34 @@ def _setup_sensor_bridge(
         int(BRIDGE_PERIODIC_INTERVAL.total_seconds()),
     )
 
+    model_name = entry.data[CONF_MODEL_NAME]
+    tracker_entity_id = f"device_tracker.{model_name}_bermuda_tracker"
+
+    from homeassistant.helpers import entity_registry as er
+    entity_reg = er.async_get(hass)
+    bermuda_entities = {
+        entity_id
+        for entity_id in all_entities
+        if (reg_entry := entity_reg.async_get(entity_id)) is not None
+        and reg_entry.platform == "bermuda"
+    }
+
     @callback
     def _publish_snapshot(_now=None) -> None:
         """Collect current states and publish to MQTT."""
+        tracker_state = hass.states.get(tracker_entity_id)
+        is_away = tracker_state is not None and tracker_state.state == "not_home"
+
         payload: dict[str, str] = {}
         for entity_id in all_entities:
-            state = hass.states.get(entity_id)
-            if state is not None:
-                payload[entity_id] = state.state
+            if is_away and entity_id in bermuda_entities:
+                payload[entity_id] = "9999"
             else:
-                payload[entity_id] = "unavailable"
+                state = hass.states.get(entity_id)
+                if state is not None:
+                    payload[entity_id] = state.state
+                else:
+                    payload[entity_id] = "unavailable"
 
         hass.async_create_task(
             mqtt.async_publish(hass, publish_topic, json.dumps(payload))
