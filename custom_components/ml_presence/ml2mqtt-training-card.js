@@ -86,14 +86,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
   getCardSize() { return 12; }
 
   async _initCard() {
-    if (!this._config.url) {
-      try { await this._initIngress(); } catch (e) {
-        console.error('ml2mqtt: ingress init failed, retrying in 5s…', e);
-        setTimeout(() => this._initCard(), 5000);
-        return;
-      }
-    }
-
     // Auto-detect model from HA user (case-insensitive, partial match)
     const userName = this._hass?.user?.name || '';
     console.log('ml2mqtt: HA user name =', userName);
@@ -143,30 +135,6 @@ class ML2MQTTTrainingCard extends HTMLElement {
   }
   _stopPolling() {
     if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
-  }
-
-  /* ── Ingress API ──────────────────────────────────────────── */
-  async _initIngress() {
-    try {
-      const info = await this._hass.callWS({
-        type: 'supervisor/api',
-        endpoint: `/addons/${this._config.addon_slug}/info`,
-        method: 'get',
-      });
-      this._ingressUrl = (info?.data || info).ingress_entry;
-    } catch (e) { console.error('ml2mqtt: addon info failed:', e); throw e; }
-
-    try {
-      const sr = await this._hass.callWS({
-        type: 'supervisor/api',
-        endpoint: '/ingress/session',
-        method: 'post',
-      });
-      const session = sr?.data?.session || sr?.session;
-      document.cookie = `ingress_session=${session};path=/api/hassio_ingress/;SameSite=Strict${
-        location.protocol === 'https:' ? ';Secure' : ''
-      }`;
-    } catch (e) { console.error('ml2mqtt: ingress session failed:', e); throw e; }
   }
 
   async _apiCall(method, path, body = null) {
