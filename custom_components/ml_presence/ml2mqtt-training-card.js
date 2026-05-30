@@ -246,6 +246,18 @@ class ML2MQTTTrainingCard extends HTMLElement {
       }
     } catch (e) { this._showToast('Error retraining', 'error'); }
   }
+  async _resetModel() {
+    this._showToast('Switching classifier to GradientBoosted…');
+    try {
+      const d = await this._apiCall('POST', `/api/model/${this._activeModel}/model-type`, { model_type: 'GradientBoosted' });
+      if (d.success) {
+        this._showToast('Model set to GradientBoosted!', 'success');
+        await this._pollLiveData();
+      }
+    } catch (e) {
+      this._showToast('Failed to change classifier', 'error');
+    }
+  }
   async _loadDataHealth() {
     try { this._renderDataHealth(await this._apiCall('GET', `${this._mp}/data-health`)); }
     catch (e) { console.error('Data health error:', e); }
@@ -480,6 +492,16 @@ class ML2MQTTTrainingCard extends HTMLElement {
         undoBtn.style.display = 'none';
       }
     }
+
+    // Show/hide reset to Gradient Boosted button dynamically
+    const resetBtn = this._els.resetModelBtn;
+    if (resetBtn) {
+      if (d.model_type && d.model_type !== 'GradientBoosted') {
+        resetBtn.style.display = 'inline-flex';
+      } else {
+        resetBtn.style.display = 'none';
+      }
+    }
   }
 
   /* ── Model Switcher ───────────────────────────────────────── */
@@ -700,7 +722,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
   </div>
 
   <!-- Panels -->
-  <div class="panel"><button class="panel-hd" id="dataPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.data}" class="panel-icon"></ha-icon> Data Manager</span><span class="chev" id="dataPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="dataPanel" style="max-height:0px"><div class="panel-inner"><div id="dataWarnings"></div><div id="labelBars"></div><div class="panel-acts"><button class="act retrain" id="retrainBtn"><ha-icon icon="${ML_ICONS.retrain}" class="act-icon"></ha-icon> Retrain Model</button></div></div></div></div>
+  <div class="panel"><button class="panel-hd" id="dataPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.data}" class="panel-icon"></ha-icon> Data Manager</span><span class="chev" id="dataPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="dataPanel" style="max-height:0px"><div class="panel-inner"><div id="dataWarnings"></div><div id="labelBars"></div><div class="panel-acts"><button class="act retrain" id="retrainBtn"><ha-icon icon="${ML_ICONS.retrain}" class="act-icon"></ha-icon> Retrain Model</button><button class="act reset-model" id="resetModelBtn" style="display: none; margin-left: 8px;"><ha-icon icon="${ML_ICONS.wipe}" class="act-icon"></ha-icon> Reset to Gradient Boosted</button></div></div></div></div>
   <div class="panel"><button class="panel-hd" id="confPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.matrix}" class="panel-icon"></ha-icon> Confusion Matrix</span><span class="chev" id="confPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="confPanel" style="max-height:0px"><div class="panel-inner"><div id="confMatrix" class="cm-wrap"><div class="empty">Train 2+ labels to see matrix</div></div></div></div></div>
   <div class="panel"><button class="panel-hd" id="sensorPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.sensors}" class="panel-icon"></ha-icon> Sensor Management</span><span class="chev" id="sensorPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="sensorPanel" style="max-height:0px"><div class="panel-inner"><div id="sensorList" class="sm-list"><div class="empty">Loading…</div></div></div></div></div>
 
@@ -729,6 +751,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
       dataWarnings: $('dataWarnings'), labelBars: $('labelBars'),
       confMatrix: $('confMatrix'), sensorList: $('sensorList'),
       newLabelInput: $('newLabelInput'), toast: $('toast'),
+      resetModelBtn: $('resetModelBtn'),
     };
   }
 
@@ -740,6 +763,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
     $('sensorPanelToggle').addEventListener('click', () => this._togglePanel('sensorPanel'));
     $('retrainBtn').addEventListener('click', () => this._retrainModel());
+    $('resetModelBtn').addEventListener('click', () => this._resetModel());
     $('addLabelBtn').addEventListener('click', () => this._addLabel(this._els.newLabelInput.value));
     $('newLabelInput').addEventListener('keydown', e => { if (e.key === 'Enter') this._addLabel(this._els.newLabelInput.value); });
   }
@@ -876,6 +900,8 @@ ha-icon{--mdc-icon-size:18px}
 .act:active{transform:scale(.96)}
 .act.retrain{background:transparent;border-color:var(--c);color:var(--c)}
 .act.retrain:hover{background:rgba(var(--c-rgb),0.1);color:var(--c)}
+.act.reset-model{background:transparent;border-color:var(--o);color:var(--o)}
+.act.reset-model:hover{background:rgba(var(--o-rgb),0.1);color:var(--o)}
 
 /* Data Health (Manager) */
 .warn-box{display:flex;align-items:center;gap:10px;padding:12px;margin-bottom:14px;border-radius:10px;font-size:.85rem;background:rgba(var(--y-rgb),0.1);border:1px solid rgba(var(--y-rgb),0.3);color:var(--y);font-weight:500}
