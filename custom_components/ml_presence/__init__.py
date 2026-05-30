@@ -39,7 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # How often to publish sensor snapshots even when no state changes occur.
 # Ensures "Away" data is collected when BLE sensors freeze.
-BRIDGE_PERIODIC_INTERVAL = timedelta(seconds=30)
+BRIDGE_PERIODIC_INTERVAL = timedelta(seconds=5)
 
 
 class MlPresenceProxyView(HomeAssistantView):
@@ -320,9 +320,30 @@ def _setup_sensor_bridge(
         and reg_entry.platform == "bermuda"
     }
 
+    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    last_periodic_publish = 0.0
+
     @callback
-    def _publish_snapshot(_now=None) -> None:
+    def _publish_snapshot(from_periodic: bool = False) -> None:
         """Collect current states and publish to MQTT."""
+        nonlocal last_periodic_publish
+        
+        import time
+        current_time = time.time()
+
+        # Safely check if the coordinator is active and collecting
+        is_collecting = False
+        if coordinator and coordinator.data:
+            is_collecting = coordinator.data.get("collecting", False)
+
+        # If not collecting and this is a periodic timer call, throttle to 30 seconds
+        if from_periodic and not is_collecting:
+            if current_time - last_periodic_publish < 30.0:
+                return
+
+        if from_periodic:
+            last_periodic_publish = current_time
+
         tracker_state = hass.states.get(tracker_entity_id)
         is_away = tracker_state is not None and tracker_state.state == "not_home"
 
@@ -345,7 +366,7 @@ def _setup_sensor_bridge(
     @callback
     def _on_trigger_state_change(event: Event) -> None:
         """A trigger entity changed — publish all entity states to MQTT."""
-        _publish_snapshot()
+        _publish_snapshot(from_periodic=False)
 
     unsub_event = async_track_state_change_event(
         hass, trigger_entities, _on_trigger_state_change
@@ -353,8 +374,12 @@ def _setup_sensor_bridge(
     hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub_event)
 
     # --- Periodic: publish every N seconds regardless of state changes ---
+    @callback
+    def _on_periodic_timer(_now) -> None:
+        _publish_snapshot(from_periodic=True)
+
     unsub_timer = async_track_time_interval(
-        hass, _publish_snapshot, BRIDGE_PERIODIC_INTERVAL
+        hass, _on_periodic_timer, BRIDGE_PERIODIC_INTERVAL
     )
     hass.data[DOMAIN][entry.entry_id]["unsub_listeners"].append(unsub_timer)
 
