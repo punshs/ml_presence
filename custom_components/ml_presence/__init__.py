@@ -172,6 +172,23 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up ML Presence from a config entry."""
     model_name: str = entry.data[CONF_MODEL_NAME]
+
+    # Sync options for experimental models from stable models
+    if model_name in ["sam_whoop_ts", "rhi_whoop_ts"]:
+        stable_name = "sam_whoop" if model_name == "sam_whoop_ts" else "rhi_whoop"
+        stable_entry = next(
+            (e for e in hass.config_entries.async_entries(DOMAIN) if e.data.get(CONF_MODEL_NAME) == stable_name),
+            None
+        )
+        if stable_entry:
+            new_options = dict(entry.options)
+            for k, v in stable_entry.options.items():
+                if k != CONF_ADDON_SLUG:
+                    new_options[k] = v
+            if new_options != entry.options:
+                _LOGGER.info("Syncing options for %s from %s: %s", model_name, stable_name, new_options)
+                hass.config_entries.async_update_entry(entry, options=new_options)
+
     mqtt_topic: str = entry.data.get(
         CONF_MQTT_TOPIC, f"{DEFAULT_MQTT_TOPIC_PREFIX}/{model_name}"
     )
