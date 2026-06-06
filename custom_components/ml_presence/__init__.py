@@ -326,7 +326,8 @@ def _setup_sensor_bridge(
     )
 
     model_name = entry.data[CONF_MODEL_NAME]
-    tracker_entity_id = f"device_tracker.{model_name}_bermuda_tracker"
+    tracker_model = model_name[:-3] if model_name.endswith("_ts") else model_name
+    tracker_entity_id = f"device_tracker.{tracker_model}_bermuda_tracker"
 
     from homeassistant.helpers import entity_registry as er
     entity_reg = er.async_get(hass)

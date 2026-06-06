@@ -59,7 +59,8 @@ class MlPresenceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ) from err
 
         # Override prediction if user is away according to the Bermuda tracker
-        tracker_entity_id = f"device_tracker.{self.model_name}_bermuda_tracker"
+        tracker_model = self.model_name[:-3] if self.model_name.endswith("_ts") else self.model_name
+        tracker_entity_id = f"device_tracker.{tracker_model}_bermuda_tracker"
         tracker_state = self.hass.states.get(tracker_entity_id)
         if tracker_state is not None and tracker_state.state == "not_home":
             data["prediction"] = "away"
@@ -75,7 +76,8 @@ class MlPresenceCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         dispatches to all listening entities immediately.
         """
         # Override prediction if user is away according to the Bermuda tracker
-        tracker_entity_id = f"device_tracker.{self.model_name}_bermuda_tracker"
+        tracker_model = self.model_name[:-3] if self.model_name.endswith("_ts") else self.model_name
+        tracker_entity_id = f"device_tracker.{tracker_model}_bermuda_tracker"
         tracker_state = self.hass.states.get(tracker_entity_id)
         if tracker_state is not None and tracker_state.state == "not_home":
             prediction = "away"
