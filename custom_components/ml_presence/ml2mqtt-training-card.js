@@ -437,10 +437,10 @@ class ML2MQTTTrainingCard extends HTMLElement {
   }
 
   _updateStats(d) {
-    this._els.obsCount.textContent = d.observation_count || 0;
+    this._els.obsCount.textContent = `${d.observation_count || 0}${d.is_temporal ? ' (TS)' : ''}`;
     const acc = d.accuracy;
     this._els.accuracy.textContent = acc != null ? `${Math.round(acc * 100)}%` : '—';
-    const counts = d.total_label_counts || d.label_stats;
+    const counts = d.is_temporal ? (d.temporal_label_counts || d.label_stats) : (d.total_label_counts || d.label_stats);
     if (counts) {
       this._els.labelBreakdown.innerHTML = Object.entries(counts)
         .map(([l, c]) => `<span class="lbl-cnt"><b>${this._esc(l)}</b> ${c}</span>`).join('');
@@ -462,10 +462,14 @@ class ML2MQTTTrainingCard extends HTMLElement {
     const modeStatusEl = this.shadowRoot.getElementById('trainingModeStatus');
     if (modeStatusEl && this._selectedLabel) {
       const d = this._lastLiveData;
-      const counts = d ? (d.total_label_counts || d.label_stats) : null;
+      const isTemporal = d && d.is_temporal;
+      const counts = d ? (isTemporal ? d.temporal_label_counts : d.total_label_counts) || d.label_stats : null;
       const support = (counts && counts[this._selectedLabel]) || 0;
       if (this._isCollecting) {
-        if (support < 200) {
+        if (isTemporal) {
+          modeStatusEl.textContent = `Time Series Logging: Saving raw data (${support} windows)`;
+          modeStatusEl.className = 'mode-status eager';
+        } else if (support < 200) {
           modeStatusEl.textContent = `Eager Bootstrapping: Saving all data (${support}/200)`;
           modeStatusEl.className = 'mode-status eager';
         } else {
@@ -473,7 +477,8 @@ class ML2MQTTTrainingCard extends HTMLElement {
           modeStatusEl.className = 'mode-status active-learning';
         }
       } else {
-        modeStatusEl.textContent = `Selected room: ${this._selectedLabel} (${support} obs)`;
+        const unit = isTemporal ? 'windows' : 'obs';
+        modeStatusEl.textContent = `Selected room: ${this._selectedLabel} (${support} ${unit})`;
         modeStatusEl.className = 'mode-status idle';
       }
     }
@@ -542,6 +547,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
     w.innerHTML = (data.warnings?.length) ? data.warnings.map(wr => `<div class="warn-box"><ha-icon icon="${ML_ICONS.warning}" class="warn-icon"></ha-icon>${this._esc(wr.msg)}</div>`).join('') : '';
     const b = this._els.labelBars;
     const counts = data.label_counts || {};
+    const isTemporal = !!data.is_temporal;
     const entries = Object.entries(counts).sort((a, bb) => bb[1] - a[1]);
     const mx = Math.max(...Object.values(counts), 1);
     const total = Object.values(counts).reduce((s, v) => s + v, 0);
@@ -552,7 +558,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
       return `<div class="dh-item">
         <div class="dh-head">
           <span class="dh-name">${this._esc(l)}</span>
-          <div class="dh-stats"><span class="dh-num">${c} obs</span><span class="dh-pct">${absPct}%</span>
+          <div class="dh-stats"><span class="dh-num">${c} ${isTemporal ? 'windows' : 'obs'}</span><span class="dh-pct">${absPct}%</span>
           <button class="icon-btn wipe-btn-row" data-label="${this._esc(l)}" title="Wipe observations (keep room)"><ha-icon icon="${ML_ICONS.wipe}"></ha-icon></button>
           <button class="icon-btn del-btn-row" data-label="${this._esc(l)}" title="Delete room & observations"><ha-icon icon="${ML_ICONS.delete}"></ha-icon></button></div>
         </div>
