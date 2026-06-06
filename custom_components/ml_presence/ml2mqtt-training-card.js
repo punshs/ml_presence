@@ -246,13 +246,16 @@ class ML2MQTTTrainingCard extends HTMLElement {
       }
     } catch (e) { this._showToast('Error retraining', 'error'); }
   }
-  async _resetModel() {
-    this._showToast('Switching classifier to GradientBoosted…');
+  async _changeModelType(newType) {
+    if (!newType) return;
+    this._showToast(`Switching classifier to ${newType}…`);
     try {
-      const d = await this._apiCall('POST', `/api/model/${this._activeModel}/model-type`, { model_type: 'GradientBoosted' });
+      const d = await this._apiCall('POST', `/api/model/${this._activeModel}/model-type`, { model_type: newType });
       if (d.success) {
-        this._showToast('Model set to GradientBoosted!', 'success');
+        this._showToast(`Model set to ${newType}!`, 'success');
         await this._pollLiveData();
+        // Automatically trigger a retrain
+        await this._retrainModel();
       }
     } catch (e) {
       this._showToast('Failed to change classifier', 'error');
@@ -493,14 +496,10 @@ class ML2MQTTTrainingCard extends HTMLElement {
       }
     }
 
-    // Show/hide reset to Gradient Boosted button dynamically
-    const resetBtn = this._els.resetModelBtn;
-    if (resetBtn) {
-      if (d.model_type && d.model_type !== 'GradientBoosted') {
-        resetBtn.style.display = 'inline-flex';
-      } else {
-        resetBtn.style.display = 'none';
-      }
+    // Sync classifier dropdown value
+    const select = this._els.modelTypeSelect;
+    if (select && d.configured_type && select.value !== d.configured_type) {
+      select.value = d.configured_type;
     }
   }
 
@@ -722,7 +721,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
   </div>
 
   <!-- Panels -->
-  <div class="panel"><button class="panel-hd" id="dataPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.data}" class="panel-icon"></ha-icon> Data Manager</span><span class="chev" id="dataPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="dataPanel" style="max-height:0px"><div class="panel-inner"><div id="dataWarnings"></div><div id="labelBars"></div><div class="panel-acts"><button class="act retrain" id="retrainBtn"><ha-icon icon="${ML_ICONS.retrain}" class="act-icon"></ha-icon> Retrain Model</button><button class="act reset-model" id="resetModelBtn" style="display: none; margin-left: 8px;"><ha-icon icon="${ML_ICONS.wipe}" class="act-icon"></ha-icon> Reset to Gradient Boosted</button></div></div></div></div>
+  <div class="panel"><button class="panel-hd" id="dataPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.data}" class="panel-icon"></ha-icon> Data Manager</span><span class="chev" id="dataPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="dataPanel" style="max-height:0px"><div class="panel-inner"><div id="dataWarnings"></div><div id="labelBars"></div><div class="panel-acts"><button class="act retrain" id="retrainBtn"><ha-icon icon="${ML_ICONS.retrain}" class="act-icon"></ha-icon> Retrain Model</button><div class="model-select-wrapper" style="margin-left: 8px; display: inline-flex; align-items: center; gap: 6px;"><span style="font-size: 13px; color: var(--tx);">Classifier:</span><select id="modelTypeSelect" style="background: var(--bgd); color: var(--tx); border: 1px solid var(--bdr); border-radius: 4px; padding: 4px 8px; font-size: 13px; outline: none; cursor: pointer;"><option value="RandomForest">Random Forest</option><option value="KNN">K-Nearest Neighbors</option><option value="GradientBoosted">Gradient Boosted</option><option value="TemporalXGBoost">Temporal XGBoost</option><option value="TemporalGRU">Temporal GRU (Neural Net)</option><option value="TemporalCNN1D">Temporal CNN 1D (Neural Net)</option></select></div></div></div></div></div>
   <div class="panel"><button class="panel-hd" id="confPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.matrix}" class="panel-icon"></ha-icon> Confusion Matrix</span><span class="chev" id="confPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="confPanel" style="max-height:0px"><div class="panel-inner"><div id="confMatrix" class="cm-wrap"><div class="empty">Train 2+ labels to see matrix</div></div></div></div></div>
   <div class="panel"><button class="panel-hd" id="sensorPanelToggle"><span class="panel-label"><ha-icon icon="${ML_ICONS.sensors}" class="panel-icon"></ha-icon> Sensor Management</span><span class="chev" id="sensorPanelChev"><ha-icon icon="${ML_ICONS.chevron}"></ha-icon></span></button><div class="panel-bd" id="sensorPanel" style="max-height:0px"><div class="panel-inner"><div id="sensorList" class="sm-list"><div class="empty">Loading…</div></div></div></div></div>
 
@@ -751,7 +750,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
       dataWarnings: $('dataWarnings'), labelBars: $('labelBars'),
       confMatrix: $('confMatrix'), sensorList: $('sensorList'),
       newLabelInput: $('newLabelInput'), toast: $('toast'),
-      resetModelBtn: $('resetModelBtn'),
+      modelTypeSelect: $('modelTypeSelect'),
     };
   }
 
@@ -763,7 +762,7 @@ class ML2MQTTTrainingCard extends HTMLElement {
     $('confPanelToggle').addEventListener('click', () => this._togglePanel('confPanel'));
     $('sensorPanelToggle').addEventListener('click', () => this._togglePanel('sensorPanel'));
     $('retrainBtn').addEventListener('click', () => this._retrainModel());
-    $('resetModelBtn').addEventListener('click', () => this._resetModel());
+    $('modelTypeSelect').addEventListener('change', e => this._changeModelType(e.target.value));
     $('addLabelBtn').addEventListener('click', () => this._addLabel(this._els.newLabelInput.value));
     $('newLabelInput').addEventListener('keydown', e => { if (e.key === 'Enter') this._addLabel(this._els.newLabelInput.value); });
   }
